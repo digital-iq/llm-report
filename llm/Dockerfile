@@ -1,7 +1,6 @@
-# Stage 1: Build the Ollama runtime
 FROM ubuntu:22.04
 
-# Install Ollama and dependencies
+# Install dependencies and Ollama
 RUN apt-get update && \
     apt-get install -y curl sudo && \
     curl -fsSL https://ollama.com/install.sh | sh && \
@@ -10,19 +9,19 @@ RUN apt-get update && \
 USER ollama
 WORKDIR /home/ollama
 
-# Inject model name via build-time argument or ENV
+# Create prompt dir for mounting
+RUN mkdir -p /home/ollama/prompts
+
+# Copy the startup script
+COPY --chown=ollama:ollama start.sh /home/ollama/start.sh
+RUN chmod +x /home/ollama/start.sh
+
+# Expose the Ollama API port
+EXPOSE 11434
+
+# Set ENV for model
 ARG MODEL_NAME
 ENV MODEL_NAME=${MODEL_NAME}
 
-# Pull the model at build time
-RUN ollama pull $MODEL_NAME
-
-# Create a directory for prompt mounting
-RUN mkdir -p /home/ollama/prompts
-
-# Expose Ollama API
-EXPOSE 11434
-
-# Serve with prompt file as system prompt
-ENTRYPOINT ["sh", "-c"]
-CMD ["ollama", "serve", "--model", "${MODEL_NAME}"]
+# Start via our script
+ENTRYPOINT ["/home/ollama/start.sh"]
