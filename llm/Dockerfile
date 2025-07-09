@@ -16,7 +16,6 @@ RUN mkdir -p /home/ollama/prompts
 COPY --chown=ollama:ollama start.sh /home/ollama/start.sh
 RUN chmod +x /home/ollama/start.sh
 
-RUN chmod -R 777 /home/ollama/.ollama
 
 # Expose the Ollama API port
 EXPOSE 11434
