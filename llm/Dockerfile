@@ -24,4 +24,5 @@ RUN mkdir -p /home/ollama/prompts
 EXPOSE 11434
 
 # Serve with prompt file as system prompt
-CMD ollama serve --model $MODEL_NAME
+ENTRYPOINT ["sh", "-c"]
+CMD ["ollama", "serve", "--model", "${MODEL_NAME}"]
