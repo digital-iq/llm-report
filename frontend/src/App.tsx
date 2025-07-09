@@ -19,12 +19,11 @@ function App() {
       const response = await axios.post('/api/generate-report', {
         request_text: requestText
       });
-
-      setHistory(response.data.report_sections);
-      setAssembledReport(response.data.assembled_report);
+      setHistory(response.data.report_sections || []);
+      setAssembledReport(response.data.assembled_report || '');
     } catch (error) {
       console.error('Error:', error);
-      alert('Failed to generate report');
+      alert('Error contacting the orchestrator');
     } finally {
       setLoading(false);
     }
@@ -77,3 +76,4 @@ function App() {
 }
 
 export default App;
+
