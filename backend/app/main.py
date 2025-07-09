@@ -1,13 +1,24 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any
 from app.utils import call_service
 
 app = FastAPI()
 
-# Internal service URLs (adjust to your OpenShift Services)
-MANAGER1_URL = "http://manager1-service:8080"
-MANAGER2_URL = "http://manager2-service:8080"
+# ⭐ ADD THIS for CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# === Existing code ===
+
+MANAGER1_URL = "http://manager1-service.llm-report.svc.cluster.local:8080"
+MANAGER2_URL = "http://manager2-service.llm-report.svc.cluster.local:8080"
 
 class UserRequest(BaseModel):
     request_text: str
@@ -48,3 +59,4 @@ async def generate_report(user_request: UserRequest):
         "report_sections": report_sections,
         "assembled_report": assembled_report
     }
+
