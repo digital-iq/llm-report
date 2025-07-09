@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { loadConfig, RuntimeConfig } from './config';
 import './App.css';
 
 interface ReportSection {
@@ -8,15 +9,30 @@ interface ReportSection {
 }
 
 function App() {
+  const [orchestratorUrl, setOrchestratorUrl] = useState('/api');
   const [requestText, setRequestText] = useState('');
   const [history, setHistory] = useState<ReportSection[]>([]);
   const [assembledReport, setAssembledReport] = useState('');
   const [loading, setLoading] = useState(false);
+  const [configLoaded, setConfigLoaded] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    loadConfig()
+      .then((cfg: RuntimeConfig) => {
+        setOrchestratorUrl(cfg.ORCHESTRATOR_URL);
+        setConfigLoaded(true);
+      })
+      .catch((e) => {
+        console.error('Error loading config:', e);
+        setError('Failed to load configuration.');
+      });
+  }, []);
 
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      const response = await axios.post('/api/generate-report', {
+      const response = await axios.post(`${orchestratorUrl}/generate-report`, {
         request_text: requestText
       });
       setHistory(response.data.report_sections || []);
@@ -34,6 +50,14 @@ function App() {
     setHistory([]);
     setAssembledReport('');
   };
+
+  if (error) {
+    return <div className="app-container"><h1>Error</h1><p>{error}</p></div>
+  }
+
+  if (!configLoaded) {
+    return <div className="app-container"><p>Loading configuration...</p></div>
+  }
 
   return (
     <div className="app-container">
