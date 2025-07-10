@@ -10,9 +10,7 @@ from app.utils import call_service
 # ----------------------------------------------------------------------------
 
 # For production, specify only your actual frontend route here
-ALLOWED_ORIGINS = [
-    "*"
-]
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "").split(",")
 
 MANAGER1_URL = os.getenv("MANAGER1_URL", "http://manager1-service.llm-report.svc.cluster.local:8080")
 MANAGER2_URL = os.getenv("MANAGER2_URL", "http://manager2-service.llm-report.svc.cluster.local:8080")
