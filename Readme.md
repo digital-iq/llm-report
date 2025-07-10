@@ -1,3 +1,4 @@
+```
 +-----------------------------------------------+
 | User (or External App)                        |
 |    Sends high-level report request            |
@@ -27,4 +28,4 @@
 |    - Returns plausible outputs                |
 |    - Reads prompt from ConfigMap              |
 +-------------------------------+---------------+
-
+```
