@@ -13,14 +13,21 @@ ALLOWED_ORIGINS = [
     "*"
 ]
 
-MANAGER1_URL = "http://manager1-service.llm-report.svc.cluster.local:8080"
-MANAGER2_URL = "http://manager2-service.llm-report.svc.cluster.local:8080"
+MANAGER1_URL = os.getenv("MANAGER1_URL", "http://manager1-service.llm-report.svc.cluster.local:8080")
+MANAGER2_URL = os.getenv("MANAGER2_URL", "http://manager2-service.llm-report.svc.cluster.local:8080")
 
 # ----------------------------------------------------------------------------
 # FastAPI App Setup
 # ----------------------------------------------------------------------------
 
 app = FastAPI(title="LLM Orchestrator", version="1.0")
+
+# ----------------------------------------------------------------------------
+# Health Check
+# ----------------------------------------------------------------------------
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 # Enable CORS
 app.add_middleware(
