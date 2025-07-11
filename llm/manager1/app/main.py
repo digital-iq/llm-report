@@ -39,17 +39,29 @@ MODEL_NAME = load_model_name()
 # UTILS
 # ----------------------------------------------------------------------------
 
-def extract_json_from_text(text: str):
+def extract_all_json_objects(text: str):
     """
-    Try to extract the first JSON object or array found in the text.
+    Extract all JSON objects or arrays found in the text.
+    Returns a list of dicts.
     """
+    json_objects = []
     try:
-        match = re.search(r'(\{.*\}|\[.*\])', text, re.DOTALL)
-        if match:
-            return json.loads(match.group(0))
+        # Greedy matching of braces/brackets
+        pattern = r'(\{.*?\}|\[.*?\])'
+        matches = re.findall(pattern, text, re.DOTALL)
+        for match in matches:
+            try:
+                obj = json.loads(match)
+                if isinstance(obj, dict):
+                    json_objects.append(obj)
+                elif isinstance(obj, list):
+                    json_objects.extend(obj)
+            except Exception as e:
+                logger.warning(f"Failed to parse match as JSON: {e}")
+        return json_objects
     except Exception as e:
-        logger.error(f"Regex JSON extraction failed: {e}")
-    return None
+        logger.error(f"Regex extraction error: {e}")
+    return []
 
 # ----------------------------------------------------------------------------
 # FastAPI App
@@ -73,7 +85,7 @@ async def process_task(request: ProcessRequest):
 USER REQUEST:
 {request.user_request}
 
-Return the list of subtasks in JSON format:
+Return ONLY a valid JSON array of subtasks with no extra text before or after.
 """
 
     ollama_payload = {
@@ -88,21 +100,28 @@ Return the list of subtasks in JSON format:
         raw_response = result.get("response", "")
         logger.info(f"Ollama raw response: {raw_response}")
 
-        # First attempt: direct JSON
+        # Attempt 1: Direct parse as JSON list
         try:
             parsed = json.loads(raw_response)
+            if isinstance(parsed, dict):
+                logger.warning("Ollama returned single JSON object instead of list. Wrapping it.")
+                parsed = [parsed]
+            elif not isinstance(parsed, list):
+                raise ValueError("Ollama output is not a list or object.")
+            logger.info("Direct JSON parse successful.")
             return {"subtasks": parsed}
         except json.JSONDecodeError as e:
             logger.warning(f"Direct JSON parse failed: {e}")
 
-        # Second attempt: extract JSON from text
-        parsed = extract_json_from_text(raw_response)
-        if parsed:
-            logger.info("Successfully extracted JSON from text fallback.")
-            return {"subtasks": parsed}
+        # Attempt 2: Fallback extraction from text
+        logger.info("Attempting fallback regex-based JSON extraction...")
+        parsed_list = extract_all_json_objects(raw_response)
+        if parsed_list:
+            logger.info(f"Successfully extracted {len(parsed_list)} JSON object(s) from text fallback.")
+            return {"subtasks": parsed_list}
 
-        logger.error("Failed to extract JSON from Ollama response.")
-        raise HTTPException(status_code=500, detail="Ollama returned non-JSON output. Please refine your system prompt.")
+        logger.error("Failed to extract any JSON from Ollama response.")
+        raise HTTPException(status_code=500, detail="Ollama returned no usable JSON subtasks. Please refine your system prompt.")
 
     except Exception as e:
         logger.error(f"Ollama call failed: {e}")
