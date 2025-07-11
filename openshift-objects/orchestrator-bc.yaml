@@ -1,0 +1,21 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: orchestrator-build
+  namespace: llm-report
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/digital-iq/llm-report.git
+      ref: main
+    contextDir: frontend-v2
+    sourceSecret:
+      name: github-token-secret
+  strategy:
+    type: Docker
+  output:
+    to:
+      kind: ImageStreamTag
+      name: orchestrator-image:v0.1
+

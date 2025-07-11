@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orchestrator
+  namespace: llm-report
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orchestrator
+  template:
+    metadata:
+      labels:
+        app: orchestrator
+    spec:
+      containers:
+        - name: orchestrator
+          image: image-registry.openshift-image-registry.svc:5000/llm-report/orchestrator-image:v0.1
+          ports:
+            - containerPort: 8080
+          env:
+            - name: MANAGER1_URL
+              value: "http://manager1-service:8080"
+            - name: FLASK_SECRET_KEY
+              value: "changeme"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
