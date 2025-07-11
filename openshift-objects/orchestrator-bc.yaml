@@ -9,7 +9,7 @@ spec:
     git:
       uri: https://github.com/digital-iq/llm-report.git
       ref: main
-    contextDir: frontend-v2
+    contextDir: orchestrator
     sourceSecret:
       name: github-token-secret
   strategy:
