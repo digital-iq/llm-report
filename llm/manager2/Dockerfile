@@ -11,7 +11,7 @@ WORKDIR /home/ollama
 COPY --chown=ollama:ollama requirements.txt ./
 RUN pip install --user -r requirements.txt
 
-RUN gem install asciidoctor-pdf
+RUN gem install --user-install asciidoctor-pdf
 
 COPY --chown=ollama:ollama app ./app
 COPY --chown=ollama:ollama start.sh ./start.sh
