@@ -22,6 +22,43 @@ os.makedirs(REPORTS_PATH, exist_ok=True)
 TIMEOUT = httpx.Timeout(connect=30.0, read=300.0, write=300.0, pool=60.0)
 
 # ----------------------------------------------------------------------------
+# HELPER FUNCTIONS
+# ----------------------------------------------------------------------------
+
+def is_engineer1_task(subtask):
+    fmt = subtask.get("expected_format", "").lower()
+    prompt_text = subtask.get("manager2_prompt", "").lower()
+    if "command" in fmt or "plain text" in fmt:
+        return True
+    if "provide commands" in prompt_text or "command outputs" in prompt_text:
+        return True
+    return False
+
+def emulate_engineer1_output(subtask):
+    return {
+        "final_output": f"""[EMULATED ENGINEER1 OUTPUT]
+
+This is simulated command output for subtask:
+
+{subtask.get('subtask', 'Unknown Task')}
+
+Example results:
+
+oc get nodes
+----------------
+NAME       STATUS   ROLES    AGE   VERSION
+master-0   Ready    master   60d   v4.12.3
+worker-0   Ready    worker   60d   v4.12.3
+
+oc get pods --all-namespaces
+------------------------------
+NAMESPACE       NAME                           READY   STATUS
+openshift-api   api-server-xyz                 1/1     Running
+...
+"""
+    }
+
+# ----------------------------------------------------------------------------
 # ROUTES
 # ----------------------------------------------------------------------------
 
@@ -70,21 +107,37 @@ def generate():
             if not subtasks:
                 raise ValueError("Manager1 did not return any subtasks.")
 
-            # Step 2: For each subtask → call Manager2
+            # Step 2: For each subtask → emulate Engineer1 or call Manager2
             assembled_sections = []
+            prior_context = ""
             for idx, subtask in enumerate(subtasks, start=1):
-                manager2_payload = {"subtask": subtask}
-                res2 = client.post(f"{MANAGER2_URL}/process", json=manager2_payload)
-                res2.raise_for_status()
-                manager2_result = res2.json()
+                if is_engineer1_task(subtask):
+                    # Emulate Engineer1
+                    engineer1_result = emulate_engineer1_output(subtask)
+                    full_conversation.append({
+                        "role": f"engineer1 (subtask {idx})",
+                        "content": json.dumps(engineer1_result, indent=2)
+                    })
+                    prior_context += f"\n\nENGINEER1 OUTPUT:\n{engineer1_result['final_output']}"
+                    assembled_sections.append(engineer1_result["final_output"])
+                else:
+                    # Manager2 uses prior_context
+                    manager2_payload = {
+                        "subtask": subtask,
+                        "prior_context": prior_context
+                    }
+                    res2 = client.post(f"{MANAGER2_URL}/process", json=manager2_payload)
+                    res2.raise_for_status()
+                    manager2_result = res2.json()
 
-                full_conversation.append({
-                    "role": f"manager2 (subtask {idx})",
-                    "content": json.dumps(manager2_result, indent=2)
-                })
+                    full_conversation.append({
+                        "role": f"manager2 (subtask {idx})",
+                        "content": json.dumps(manager2_result, indent=2)
+                    })
 
-                section = manager2_result.get("final_output", "")
-                assembled_sections.append(section)
+                    section = manager2_result.get("final_output", "")
+                    assembled_sections.append(section)
+                    prior_context += f"\n\nMANAGER2 OUTPUT:\n{section}"
 
             # Step 3: Assemble AsciiDoctor document
             assembled_doc = "\n\n".join(assembled_sections)

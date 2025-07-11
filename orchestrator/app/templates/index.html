@@ -6,9 +6,11 @@
   <style>
     body { font-family: Arial, sans-serif; margin: 2rem; background: #f9f9f9; }
     .chat-container { max-width: 800px; margin: auto; background: #fff; padding: 1rem; border-radius: 8px; box-shadow: 0 0 10px #ccc; }
-    .message { margin-bottom: 1rem; }
-    .user { background: #dff0d8; padding: 0.75rem; border-radius: 8px; }
-    .manager { background: #d9edf7; padding: 0.75rem; border-radius: 8px; margin-top: 0.5rem; }
+    .message { margin-bottom: 1rem; border-radius: 8px; padding: 0.75rem; }
+    .user { background: #dff0d8; }
+    .manager { background: #d9edf7; }
+    .engineer { background: #fcf8e3; }
+    .error { background: #f2dede; color: #a94442; }
     .thread { border: 1px solid #ccc; border-radius: 6px; margin-bottom: 1rem; overflow: hidden; }
     .thread-header { background: #f5f5f5; padding: 0.5rem 1rem; cursor: pointer; font-weight: bold; }
     .thread-body { padding: 1rem; display: none; }
@@ -36,6 +38,7 @@
     textarea { width: 100%; height: 100px; }
     .buttons { margin-top: 1rem; }
     pre { white-space: pre-wrap; word-wrap: break-word; background: #f7f7f9; padding: 0.5rem; border-radius: 4px; }
+    .role-badge { font-weight: bold; margin-bottom: 0.25rem; display: inline-block; }
   </style>
   <script>
     function toggleThread(id) {
@@ -79,13 +82,18 @@
           </div>
           <div class="thread-body" id="body-{{ thread_idx }}">
             <div class="message user">
-              <strong>User:</strong>
+              <div class="role-badge">User:</div>
               <pre>{{ thread.user_request }}</pre>
             </div>
+
             {% for msg in thread.messages %}
               {% set msg_idx = loop.index0 %}
-              <div class="message manager">
-                <strong>{{ msg.role|capitalize }}:</strong>
+              <div class="message
+                {% if 'manager1' in msg.role.lower() %}manager{% endif %}
+                {% if 'manager2' in msg.role.lower() %}manager{% endif %}
+                {% if 'engineer1' in msg.role.lower() %}engineer{% endif %}
+                {% if 'error' in msg.role.lower() %}error{% endif %}">
+                <div class="role-badge">{{ msg.role|capitalize }}:</div>
                 <div id="expand-{{ thread_idx }}-{{ msg_idx }}" class="expandable">
                   <pre>{{ msg.content }}</pre>
                 </div>

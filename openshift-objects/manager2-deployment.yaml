@@ -31,7 +31,7 @@ spec:
             - name: model-volume
               mountPath: /home/ollama/model
       containers:
-        - name: manager1
+        - name: manager2
           image: image-registry.openshift-image-registry.svc:5000/llm-report/manager2:v0.1
           imagePullPolicy: Always
           ports:
