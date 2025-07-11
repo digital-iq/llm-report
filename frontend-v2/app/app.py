@@ -38,11 +38,19 @@ def generate():
     duration = round(end_time - start_time, 2)
 
     history = session.get("history", [])
+
+    # NEW: store whole thread
     history.append({
-        "prompt": prompt,
-        "response": json.dumps(result, indent=2),
+        "user_request": prompt,
+        "messages": [
+            {
+                "role": "manager1",
+                "content": json.dumps(result, indent=2)
+            }
+        ],
         "response_time": duration
     })
+
     session["history"] = history
 
     return redirect("/")
