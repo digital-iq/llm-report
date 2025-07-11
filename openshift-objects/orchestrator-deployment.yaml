@@ -22,8 +22,17 @@ spec:
           env:
             - name: MANAGER1_URL
               value: "http://manager1-service.llm-report.svc.cluster.local:8080"
+            - name: MANAGER2_URL
+              value: "http://manager2-service.llm-report.svc.cluster.local:8080"
+            - name: REPORTS_PATH
+              value: "/reports"
+            - name: ASCIIDOCTOR_CMD
+              value: "asciidoctor-pdf"
             - name: FLASK_SECRET_KEY
               value: "changeme"
+          volumeMounts:
+            - name: reports-volume
+              mountPath: /reports
           livenessProbe:
             httpGet:
               path: /health
@@ -36,3 +45,8 @@ spec:
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 5
+      volumes:
+        - name: reports-volume
+          persistentVolumeClaim:
+            claimName: orchestrator-reports-pvc
+
