@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from flask import Flask, request, render_template, redirect, session, jsonify
 import httpx
 
@@ -24,6 +25,7 @@ def generate():
     if not prompt:
         return redirect("/")
 
+    start_time = time.time()
     try:
         payload = {"user_request": prompt}
         with httpx.Client(timeout=TIMEOUT) as client:
@@ -32,11 +34,14 @@ def generate():
             result = res.json()
     except Exception as e:
         result = {"error": f"Failed to contact Manager1: {str(e)}"}
+    end_time = time.time()
+    duration = round(end_time - start_time, 2)
 
     history = session.get("history", [])
     history.append({
         "prompt": prompt,
-        "response": json.dumps(result, indent=2)
+        "response": json.dumps(result, indent=2),
+        "response_time": duration
     })
     session["history"] = history
 

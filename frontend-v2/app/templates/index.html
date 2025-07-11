@@ -1,30 +1,54 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>LLM Report Generator</title>
+  <meta charset="UTF-8" />
+  <title>LLM Report Orchestrator</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem; vertical-align: top; }
+    th { background: #f0f0f0; }
+    textarea { width: 100%; height: 100px; }
+    .buttons { margin-top: 1rem; }
+  </style>
 </head>
 <body>
-  <h1>LLM Report Generator</h1>
+  <h1>LLM Report Orchestrator</h1>
+
   <form action="/generate" method="post">
-    <textarea name="request_text" rows="10" cols="80" required></textarea>
-    <br>
-    <button type="submit">Submit</button>
+    <label for="request_text">Enter your request for Manager #1:</label><br>
+    <textarea name="request_text" required></textarea><br>
+    <div class="buttons">
+      <input type="submit" value="Submit">
+    </div>
   </form>
 
+  <form action="/clear" method="post">
+    <div class="buttons">
+      <input type="submit" value="Clear History">
+    </div>
+  </form>
+
+  <h2>Request History</h2>
   {% if history %}
-    <h2>History</h2>
-    <table border="1">
-      <tr>
-        <th>Prompt</th>
-        <th>Manager1 Response</th>
-      </tr>
-      {% for item in history %}
-      <tr>
-        <td>{{ item.prompt }}</td>
-        <td><pre>{{ item.response }}</pre></td>
-      </tr>
-      {% endfor %}
-    </table>
+  <table>
+    <tr>
+      <th>#</th>
+      <th>User Request</th>
+      <th>Manager1 Response</th>
+      <th>Response Time (seconds)</th>
+    </tr>
+    {% for idx, item in enumerate(history, start=1) %}
+    <tr>
+      <td>{{ idx }}</td>
+      <td><pre>{{ item.prompt }}</pre></td>
+      <td><pre>{{ item.response }}</pre></td>
+      <td>{{ item.response_time }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+    <p><em>No history yet.</em></p>
   {% endif %}
 </body>
 </html>
