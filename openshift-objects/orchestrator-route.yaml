@@ -4,8 +4,8 @@ metadata:
   name: orchestrator-route
   namespace: llm-report
   annotations:
-    haproxy.router.openshift.io/timeout: 5m
-    haproxy.router.openshift.io/timeout-tunnel: 5m
+    haproxy.router.openshift.io/timeout: 10m
+    haproxy.router.openshift.io/timeout-tunnel: 10m
 spec:
   to:
     kind: Service
