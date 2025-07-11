@@ -32,6 +32,8 @@
       text-decoration: underline;
     }
     .response-time { font-size: 0.85em; color: #666; margin-top: 0.25rem; }
+    textarea { width: 100%; height: 100px; }
+    .buttons { margin-top: 1rem; }
     pre { white-space: pre-wrap; word-wrap: break-word; background: #f7f7f9; padding: 0.5rem; border-radius: 4px; }
   </style>
   <script>
@@ -68,23 +70,25 @@
     <h2>Conversation History</h2>
     {% if history %}
       {% for thread in history %}
+        {% set thread_idx = loop.index0 %}
         <div class="thread">
-          <div class="thread-header" onclick="toggleThread({{ loop.index }})">
+          <div class="thread-header" onclick="toggleThread({{ thread_idx }})">
             User Request #{{ loop.index }} - Click to expand/collapse
             <span class="toggle-btn">▼</span>
           </div>
-          <div class="thread-body" id="body-{{ loop.index }}">
+          <div class="thread-body" id="body-{{ thread_idx }}">
             <div class="message user">
               <strong>User:</strong>
               <pre>{{ thread.user_request }}</pre>
             </div>
             {% for msg in thread.messages %}
+              {% set msg_idx = loop.index0 %}
               <div class="message manager">
                 <strong>{{ msg.role|capitalize }}:</strong>
-                <div id="expand-{{ loop.index }}-{{ loop.index0 }}-msg" class="expandable">
+                <div id="expand-{{ thread_idx }}-{{ msg_idx }}" class="expandable">
                   <pre>{{ msg.content }}</pre>
                 </div>
-                <span class="show-more" id="btn-{{ loop.index }}-{{ loop.index0 }}-msg" onclick="toggleExpand('{{ loop.index }}-{{ loop.index0 }}-msg')">Show more</span>
+                <span class="show-more" id="btn-{{ thread_idx }}-{{ msg_idx }}" onclick="toggleExpand('{{ thread_idx }}-{{ msg_idx }}')">Show more</span>
               </div>
             {% endfor %}
             <div class="response-time">
