@@ -38,9 +38,9 @@
       <th>Manager1 Response</th>
       <th>Response Time (seconds)</th>
     </tr>
-    {% for idx, item in enumerate(history, start=1) %}
+    {% for item in history %}
     <tr>
-      <td>{{ idx }}</td>
+      <td>{{ loop.index }}</td>
       <td><pre>{{ item.prompt }}</pre></td>
       <td><pre>{{ item.response }}</pre></td>
       <td>{{ item.response_time }}</td>
