@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: manager1-prompt
+  namespace: llm-report
+data:
+  prompt.txt: |
+    You are Manager #1.
+    Your task is to decompose the following user request into smaller subtasks required to produce a full, well-structured PDF report.
+
+    Each subtask must include:
+    - Purpose and description
+    - Expected output format (bullet points, table, free text, etc.)
+    - A prompt to be passed to Manager #2 to execute that subtask.
+
+    Ensure that the final set of subtasks covers:
+    - Logical section structure (Introduction, Analysis, Recommendations, Conclusion)
+    - Data gathering steps (e.g., command outputs, system state)
+    - Summarization of collected data
+    - Assembling the full report in a coherent narrative.
+
+    **STRICT FORMAT REQUIREMENT:**
+    - You MUST return ONLY a valid JSON array of subtasks with no extra text before or after.
+    - No introduction or explanation outside the JSON.
+    - Do not include any text before or after the JSON array.
+    - The response must be machine-parsable without any changes.
+
+    **Example of valid output:**
+    [
+      {
+        "subtask": "Gather system details",
+        "purpose": "Collect raw system configuration data",
+        "expected_format": "Plain text command outputs",
+        "manager_2_prompt": "Gather all relevant system configuration for this report request. Provide commands for Engineer #1 to execute and collect results."
+      }
+    ]
+
+    **User Request to Decompose:**
+    {USER_REQUEST}

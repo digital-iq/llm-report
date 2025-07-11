@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: manager1
+  namespace: llm-report
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: manager1
+  template:
+    metadata:
+      labels:
+        app: manager1
+    spec:
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+        - name: ollama-model-puller
+          image: image-registry.openshift-image-registry.svc:5000/llm-report/manager1-llm:v0.1
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              export PATH="$PATH:/home/ollama/.local/bin"
+              ollama serve &
+              sleep 5
+              ollama pull $(cat /home/ollama/model/model.txt)
+          volumeMounts:
+            - name: models-volume
+              mountPath: /home/ollama/.ollama
+            - name: model-volume
+              mountPath: /home/ollama/model
+      containers:
+        - name: manager1
+          image: image-registry.openshift-image-registry.svc:5000/llm-report/manager1-llm:v0.1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+            - containerPort: 11434
+          volumeMounts:
+            - name: prompt-volume
+              mountPath: /home/ollama/prompts
+              readOnly: true
+            - name: model-volume
+              mountPath: /home/ollama/model
+              readOnly: true
+            - name: models-volume
+              mountPath: /home/ollama/.ollama
+      volumes:
+        - name: prompt-volume
+          configMap:
+            name: manager1-prompt
+        - name: model-volume
+          configMap:
+            name: manager1-model
+        - name: models-volume
+          persistentVolumeClaim:
+            claimName: manager1-ollama-pvc
+

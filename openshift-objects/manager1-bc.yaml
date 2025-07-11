@@ -1,0 +1,22 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: manager1-llm
+  namespace: llm-report
+spec:
+  output:
+    to:
+      kind: ImageStreamTag
+      name: manager1-llm:v0.1
+  source:
+    type: Git
+    git:
+      uri: 'https://github.com/digital-iq/llm-report.git'
+    contextDir: llm/manager1
+    sourceSecret:
+      name: github-token-secret
+  strategy:
+    type: Docker
+  triggers:
+    - type: ConfigChange
+    - type: ImageChange
