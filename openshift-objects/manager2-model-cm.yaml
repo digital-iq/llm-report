@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: manager2-model
+  namespace: llm-report
+data:
+  model.txt: mixtral:8x7b

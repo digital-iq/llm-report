@@ -1,0 +1,5 @@
+fastapi[all]
+uvicorn
+httpx
+jinja2
+gem
