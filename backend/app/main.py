@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any
@@ -56,36 +56,42 @@ router = APIRouter(prefix="/api")
 
 @router.post("/generate-report", response_model=ReportResponse)
 async def generate_report(user_request: UserRequest):
-    """
-    Orchestrates generation of a full PDF report by:
-    1. Asking Manager #1 to decompose the request
-    2. Asking Manager #2 to complete each subtask
-    3. Assembling the results
-    """
-    # Step 1: Decompose via Manager #1
-    manager1_payload = {"user_request": user_request.request_text}
-    decomposition_result = await call_service(f"{MANAGER1_URL}/process", manager1_payload)
+    try:
+        # Step 1: Decompose via Manager #1
+        manager1_payload = {"user_request": user_request.request_text}
+        decomposition_result = await call_service(f"{MANAGER1_URL}/process", manager1_payload)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Error contacting Manager1: {str(e)}"
+        )
 
     subtasks = decomposition_result.get("subtasks", [])
     if not subtasks:
-        return {
-            "report_sections": [],
-            "assembled_report": "No subtasks were generated."
-        }
+        return ReportResponse(
+            report_sections=[],
+            assembled_report="No subtasks were generated."
+        )
 
     # Step 2: For each subtask, call Manager #2
     report_sections = []
     for subtask in subtasks:
-        manager2_payload = {"subtask": subtask}
-        subtask_result = await call_service(f"{MANAGER2_URL}/process", manager2_payload)
-        report_sections.append({
-            "subtask_title": subtask.get("subtask_title"),
-            "result": subtask_result
-        })
+        try:
+            manager2_payload = {"subtask": subtask}
+            subtask_result = await call_service(f"{MANAGER2_URL}/process", manager2_payload)
+            report_sections.append({
+                "subtask_title": subtask.get("subtask_title"),
+                "result": subtask_result
+            })
+        except Exception as e:
+            report_sections.append({
+                "subtask_title": subtask.get("subtask_title"),
+                "result": {"error": str(e)}
+            })
 
     # Step 3: Assemble Report
     assembled_report = "\n\n".join(
-        f"## {section['subtask_title']}\n\n{section['result'].get('final_output', '')}"
+        f"## {section['subtask_title']}\n\n{section['result'].get('final_output', '') if 'final_output' in section['result'] else section['result'].get('error', '')}"
         for section in report_sections
     )
 
