@@ -4,9 +4,8 @@ from flask import Flask, request, render_template, redirect, session, jsonify
 import httpx
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecret")  # required for session
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecret")
 
-# Manager1 endpoint
 MANAGER1_URL = os.getenv("MANAGER1_URL", "http://manager1-service:8080")
 TIMEOUT = httpx.Timeout(connect=30.0, read=300.0, write=300.0, pool=60.0)
 
@@ -25,7 +24,6 @@ def generate():
     if not prompt:
         return redirect("/")
 
-    # Call Manager1
     try:
         payload = {"user_request": prompt}
         with httpx.Client(timeout=TIMEOUT) as client:
@@ -35,7 +33,6 @@ def generate():
     except Exception as e:
         result = {"error": f"Failed to contact Manager1: {str(e)}"}
 
-    # Store in session history
     history = session.get("history", [])
     history.append({
         "prompt": prompt,
@@ -45,7 +42,6 @@ def generate():
 
     return redirect("/")
 
-# Optional: clear history
 @app.route("/clear", methods=["POST"])
 def clear():
     session["history"] = []

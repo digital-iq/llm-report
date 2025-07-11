@@ -2,38 +2,27 @@
 <html>
 <head>
   <title>LLM Report Generator</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    textarea { width: 100%; height: 100px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
-    th { background-color: #f2f2f2; }
-    pre { white-space: pre-wrap; word-wrap: break-word; }
-  </style>
 </head>
 <body>
   <h1>LLM Report Generator</h1>
-
   <form action="/generate" method="post">
-    <label for="request_text">Enter your prompt for Manager #1:</label><br>
-    <textarea name="request_text" required placeholder="e.g., Generate me report about OpenShift health"></textarea><br>
+    <textarea name="request_text" rows="10" cols="80" required></textarea>
+    <br>
     <button type="submit">Submit</button>
   </form>
 
   {% if history %}
-    <h2>History of Requests and Manager #1 Responses</h2>
-    <table>
+    <h2>History</h2>
+    <table border="1">
       <tr>
         <th>Prompt</th>
-        <th>Manager #1 Subtasks</th>
+        <th>Manager1 Response</th>
       </tr>
       {% for item in history %}
-        <tr>
-          <td>{{ item.prompt }}</td>
-          <td>
-            <pre>{{ item.response }}</pre>
-          </td>
-        </tr>
+      <tr>
+        <td>{{ item.prompt }}</td>
+        <td><pre>{{ item.response }}</pre></td>
+      </tr>
       {% endfor %}
     </table>
   {% endif %}
