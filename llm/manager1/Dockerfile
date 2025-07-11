@@ -17,4 +17,6 @@ RUN chmod +x start.sh
 
 EXPOSE 8080 11434
 
+ENV PYTHONUNBUFFERED=1
+
 ENTRYPOINT ["./start.sh"]
