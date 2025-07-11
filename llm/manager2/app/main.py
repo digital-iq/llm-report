@@ -1,9 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import os
-import json
 import logging
-import re
 from app.utils import call_ollama_generate
 
 # ----------------------------------------------------------------------------
@@ -17,115 +15,101 @@ logger = logging.getLogger(__name__)
 # CONFIGURATION
 # ----------------------------------------------------------------------------
 
-PROMPT_FILE_PATH = "/home/ollama/prompts/prompt.txt"
 MODEL_FILE_PATH = "/home/ollama/model/model.txt"
+PROMPT_FILE_PATH = "/home/ollama/prompts/prompt.txt"
 
 def load_system_prompt():
-    with open(PROMPT_FILE_PATH, "r") as f:
-        return f.read()
+    try:
+        with open(PROMPT_FILE_PATH, "r") as f:
+            return f.read()
+    except Exception:
+        return ""
 
 def load_model_name():
     try:
         with open(MODEL_FILE_PATH, "r") as f:
             return f.read().strip()
     except Exception:
-        # fallback if not mounted
         return "mixtral:8x7b"
 
 SYSTEM_PROMPT = load_system_prompt()
 MODEL_NAME = load_model_name()
 
 # ----------------------------------------------------------------------------
-# UTILS
-# ----------------------------------------------------------------------------
-
-def extract_all_json_objects(text: str):
-    """
-    Extract all JSON objects or arrays found in the text.
-    Returns a list of dicts.
-    """
-    json_objects = []
-    try:
-        # Greedy matching of braces/brackets
-        pattern = r'(\{.*?\}|\[.*?\])'
-        matches = re.findall(pattern, text, re.DOTALL)
-        for match in matches:
-            try:
-                obj = json.loads(match)
-                if isinstance(obj, dict):
-                    json_objects.append(obj)
-                elif isinstance(obj, list):
-                    json_objects.extend(obj)
-            except Exception as e:
-                logger.warning(f"Failed to parse match as JSON: {e}")
-        return json_objects
-    except Exception as e:
-        logger.error(f"Regex extraction error: {e}")
-    return []
-
-# ----------------------------------------------------------------------------
 # FastAPI App
 # ----------------------------------------------------------------------------
 
-app = FastAPI(title="Manager1 Service", version="1.0")
+app = FastAPI(title="Manager2 Service", version="1.0")
 
-class ProcessRequest(BaseModel):
-    user_request: str
+# ----------------------------------------------------------------------------
+# Pydantic models
+# ----------------------------------------------------------------------------
 
-class ProcessResponse(BaseModel):
-    subtasks: list
+class Subtask(BaseModel):
+    subtask: str
+    purpose: str
+    expected_format: str
+    manager2_prompt: str
 
-@app.post("/process", response_model=ProcessResponse)
-async def process_task(request: ProcessRequest):
+class SubtaskRequest(BaseModel):
+    subtask: Subtask
+
+class SubtaskResponse(BaseModel):
+    final_output: str
+
+# ----------------------------------------------------------------------------
+# Routes
+# ----------------------------------------------------------------------------
+
+@app.post("/process", response_model=SubtaskResponse)
+async def process_subtask(request: SubtaskRequest):
     """
-    Decompose user request into subtasks using system prompt and local Ollama.
+    Handles a single subtask coming from Orchestrator.
+    Decides whether to answer directly or instruct Engineer1.
     """
-    final_prompt = f"""{SYSTEM_PROMPT}
 
-USER REQUEST:
-{request.user_request}
+    sub = request.subtask
+    logger.info(f"Received subtask: {sub.dict()}")
 
-Return ONLY a valid JSON array of subtasks with no extra text before or after.
+    # Decide whether it needs Engineer1
+    if "command" in sub.expected_format.lower() or "plain text command" in sub.expected_format.lower():
+        # Needs Engineer1 (future implementation)
+        logger.warning("This subtask needs Engineer1 integration, which is not yet implemented.")
+        raise HTTPException(status_code=501, detail="Engineer1 integration not implemented yet.")
+    else:
+        # Manager2 can handle this subtask directly
+        final_prompt = f"""{SYSTEM_PROMPT}
+
+You are Manager #2. Answer the following subtask in detail.
+
+SUBTASK:
+{sub.subtask}
+
+PURPOSE:
+{sub.purpose}
+
+EXPECTED FORMAT:
+{sub.expected_format}
+
+INSTRUCTION FOR YOU:
+{sub.manager2_prompt}
 """
 
-    ollama_payload = {
-        "model": MODEL_NAME,
-        "prompt": final_prompt,
-        "stream": False
-    }
+        ollama_payload = {
+            "model": MODEL_NAME,
+            "prompt": final_prompt,
+            "stream": False
+        }
 
-    try:
-        logger.info(f"Sending prompt to Ollama: {final_prompt[:200]}...")
-        result = await call_ollama_generate(ollama_payload)
-        raw_response = result.get("response", "")
-        logger.info(f"Ollama raw response: {raw_response}")
-
-        # Attempt 1: Direct parse as JSON list
+        logger.info("Sending prompt to Ollama...")
         try:
-            parsed = json.loads(raw_response)
-            if isinstance(parsed, dict):
-                logger.warning("Ollama returned single JSON object instead of list. Wrapping it.")
-                parsed = [parsed]
-            elif not isinstance(parsed, list):
-                raise ValueError("Ollama output is not a list or object.")
-            logger.info("Direct JSON parse successful.")
-            return {"subtasks": parsed}
-        except json.JSONDecodeError as e:
-            logger.warning(f"Direct JSON parse failed: {e}")
-
-        # Attempt 2: Fallback extraction from text
-        logger.info("Attempting fallback regex-based JSON extraction...")
-        parsed_list = extract_all_json_objects(raw_response)
-        if parsed_list:
-            logger.info(f"Successfully extracted {len(parsed_list)} JSON object(s) from text fallback.")
-            return {"subtasks": parsed_list}
-
-        logger.error("Failed to extract any JSON from Ollama response.")
-        raise HTTPException(status_code=500, detail="Ollama returned no usable JSON subtasks. Please refine your system prompt.")
-
-    except Exception as e:
-        logger.error(f"Ollama call failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Ollama error: {e}")
+            result = await call_ollama_generate(ollama_payload)
+            answer = result.get("response", "").strip()
+            logger.info("Received answer from Ollama.")
+            return {"final_output": answer}
+        except Exception as e:
+            logger.error(f"Ollama call failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Ollama error: {e}")
 
 @app.get("/health")
 def health():
