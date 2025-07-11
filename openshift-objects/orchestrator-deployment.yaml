@@ -24,15 +24,17 @@ spec:
               value: "http://manager1-service.llm-report.svc.cluster.local:8080"
             - name: MANAGER2_URL
               value: "http://manager2-service.llm-report.svc.cluster.local:8080"
-            - name: REPORTS_PATH
-              value: "/reports"
-            - name: ASCIIDOCTOR_CMD
-              value: "asciidoctor-pdf"
             - name: FLASK_SECRET_KEY
               value: "changeme"
+            - name: REPORTS_PATH
+              value: "/reports"
+            - name: USER_HISTORY_PATH
+              value: "/user_histories"
           volumeMounts:
-            - name: reports-volume
+            - name: reports-storage
               mountPath: /reports
+            - name: user-history-storage
+              mountPath: /user_histories
           livenessProbe:
             httpGet:
               path: /health
@@ -46,7 +48,8 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 5
       volumes:
-        - name: reports-volume
+        - name: reports-storage
+          emptyDir: {}
+        - name: user-history-storage
           persistentVolumeClaim:
-            claimName: orchestrator-reports-pvc
-
+            claimName: orchestrator-history-pvc

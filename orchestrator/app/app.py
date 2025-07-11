@@ -22,11 +22,43 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecret")
 MANAGER1_URL = os.getenv("MANAGER1_URL", "http://manager1-service:8080")
 MANAGER2_URL = os.getenv("MANAGER2_URL", "http://manager2-service:8080")
 REPORTS_PATH = os.getenv("REPORTS_PATH", "/reports")
+USER_HISTORY_PATH = os.getenv("USER_HISTORY_PATH", "/user_histories")
 ASCIIDOCTOR_CMD = os.getenv("ASCIIDOCTOR_CMD", "asciidoctor-pdf")
 
 os.makedirs(REPORTS_PATH, exist_ok=True)
+os.makedirs(USER_HISTORY_PATH, exist_ok=True)
 
 TIMEOUT = httpx.Timeout(connect=30.0, read=300.0, write=300.0, pool=60.0)
+
+# ----------------------------------------------------------------------------
+# USER HISTORY HELPERS
+# ----------------------------------------------------------------------------
+
+def get_user_id():
+    if "user_id" not in session:
+        session["user_id"] = str(uuid.uuid4())
+    return session["user_id"]
+
+def get_history_file(user_id):
+    return os.path.join(USER_HISTORY_PATH, f"{user_id}.json")
+
+def load_history(user_id):
+    filepath = get_history_file(user_id)
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error(f"Failed to load history for {user_id}: {e}")
+    return []
+
+def save_history(user_id, history):
+    filepath = get_history_file(user_id)
+    try:
+        with open(filepath, "w") as f:
+            json.dump(history, f)
+    except Exception as e:
+        logger.error(f"Failed to save history for {user_id}: {e}")
 
 # ----------------------------------------------------------------------------
 # HELPER FUNCTIONS
@@ -81,11 +113,15 @@ def download_file(filename):
 
 @app.route("/", methods=["GET"])
 def index():
-    history = session.get("history", [])
+    user_id = get_user_id()
+    history = load_history(user_id)
     return render_template("index.html", history=history)
 
 @app.route("/generate", methods=["POST"])
 def generate():
+    user_id = get_user_id()
+    history = load_history(user_id)
+
     prompt = request.form.get("request_text", "").strip()
     if not prompt:
         return redirect("/")
@@ -101,7 +137,6 @@ def generate():
 
     try:
         with httpx.Client(timeout=TIMEOUT) as client:
-            # Step 1: Call Manager1 for task decomposition
             logger.info("Calling Manager1 for task decomposition.")
             manager1_payload = {"user_request": prompt}
             res1 = client.post(f"{MANAGER1_URL}/process", json=manager1_payload)
@@ -117,7 +152,7 @@ def generate():
             if not subtasks:
                 raise ValueError("Manager1 did not return any subtasks.")
 
-            # Step 2: Process subtasks (Engineer1 emulation + Manager2)
+            # Step 2: Process subtasks
             assembled_sections = []
             prior_context = ""
             for idx, subtask in enumerate(subtasks, start=1):
@@ -125,7 +160,6 @@ def generate():
                 logger.info(f"Processing subtask {idx}: {subtask_title}")
 
                 if is_engineer1_task(subtask):
-                    # Emulate Engineer1
                     engineer1_result = emulate_engineer1_output(subtask)
                     full_conversation.append({
                         "role": f"engineer1 (subtask {idx})",
@@ -135,7 +169,6 @@ def generate():
                     assembled_sections.append(engineer1_result["final_output"])
 
                 else:
-                    # Call Manager2 with prior_context
                     manager2_payload = {
                         "subtask": subtask,
                         "prior_context": prior_context
@@ -154,7 +187,7 @@ def generate():
                     assembled_sections.append(section)
                     prior_context += f"\n\nMANAGER2 OUTPUT:\n{section}"
 
-            # Step 3: Assemble AsciiDoctor document
+            # Step 3: Write AsciiDoctor document
             assembled_doc = "\n\n".join(assembled_sections)
             with open(adoc_path, "w") as f:
                 f.write(assembled_doc)
@@ -173,7 +206,6 @@ def generate():
 
             # Step 5: Save result in history
             duration = round(time.time() - start_time, 2)
-            history = session.get("history", [])
             history.append({
                 "user_request": prompt,
                 "messages": full_conversation,
@@ -181,12 +213,11 @@ def generate():
                 "pdf_file": f"/files/{pdf_file}",
                 "response_time": duration
             })
-            session["history"] = history
+            save_history(user_id, history)
 
     except Exception as e:
         logger.error(f"Error during generation: {e}")
         duration = round(time.time() - start_time, 2)
-        history = session.get("history", [])
         history.append({
             "user_request": prompt,
             "messages": full_conversation + [{
@@ -195,13 +226,14 @@ def generate():
             }],
             "response_time": duration
         })
-        session["history"] = history
+        save_history(user_id, history)
 
     return redirect("/")
 
 @app.route("/clear", methods=["POST"])
 def clear():
-    session["history"] = []
+    user_id = get_user_id()
+    save_history(user_id, [])
     return redirect("/")
 
 if __name__ == "__main__":
