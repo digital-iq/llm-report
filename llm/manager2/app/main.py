@@ -23,6 +23,7 @@ def load_system_prompt():
         with open(PROMPT_FILE_PATH, "r") as f:
             return f.read()
     except Exception:
+        logger.warning("Prompt file not found or unreadable. Using empty prompt.")
         return ""
 
 def load_model_name():
@@ -30,6 +31,7 @@ def load_model_name():
         with open(MODEL_FILE_PATH, "r") as f:
             return f.read().strip()
     except Exception:
+        logger.warning("Model file not found. Defaulting to 'mixtral:8x7b'")
         return "mixtral:8x7b"
 
 SYSTEM_PROMPT = load_system_prompt()
@@ -53,6 +55,7 @@ class Subtask(BaseModel):
 
 class SubtaskRequest(BaseModel):
     subtask: Subtask
+    prior_context: str = ""  # New: Orchestrator will pass accumulated prior context here
 
 class SubtaskResponse(BaseModel):
     final_output: str
@@ -64,52 +67,66 @@ class SubtaskResponse(BaseModel):
 @app.post("/process", response_model=SubtaskResponse)
 async def process_subtask(request: SubtaskRequest):
     """
-    Handles a single subtask coming from Orchestrator.
-    Decides whether to answer directly or instruct Engineer1.
+    Handles a single subtask from Orchestrator.
+    Incorporates prior_context so Manager2 can "see" Engineer1 outputs and earlier sections.
     """
 
     sub = request.subtask
-    logger.info(f"Received subtask: {sub.dict()}")
+    logger.info(f"Processing subtask: {sub.subtask}")
 
-    # Decide whether it needs Engineer1
-    if "command" in sub.expected_format.lower() or "plain text command" in sub.expected_format.lower():
-        # Needs Engineer1 (future implementation)
-        logger.warning("This subtask needs Engineer1 integration, which is not yet implemented.")
-        raise HTTPException(status_code=501, detail="Engineer1 integration not implemented yet.")
-    else:
-        # Manager2 can handle this subtask directly
-        final_prompt = f"""{SYSTEM_PROMPT}
+    # Decide whether it's intended for Engineer1
+    if "command" in sub.expected_format.lower() or "plain text" in sub.expected_format.lower():
+        logger.warning("Engineer1 task detected. This should be emulated by Orchestrator. Rejecting at Manager2 level.")
+        raise HTTPException(
+            status_code=501,
+            detail="This subtask requires Engineer1 output. Manager2 cannot handle it directly."
+        )
 
-You are Manager #2. Answer the following subtask in detail.
+    # Build the prompt including prior context
+    final_prompt = f"""{SYSTEM_PROMPT}
 
-SUBTASK:
+You are Manager #2. Your task is to answer the following subtask in detail.
+
+SUBTASK TITLE:
 {sub.subtask}
 
 PURPOSE:
 {sub.purpose}
 
-EXPECTED FORMAT:
+EXPECTED OUTPUT FORMAT:
 {sub.expected_format}
 
-INSTRUCTION FOR YOU:
+INSTRUCTION:
 {sub.manager2_prompt}
+
+----------------------------
+CONTEXT FROM EARLIER TASKS:
+{request.prior_context}
+----------------------------
+
+Your answer should consider all prior context and produce the requested section of the report.
 """
 
-        ollama_payload = {
-            "model": MODEL_NAME,
-            "prompt": final_prompt,
-            "stream": False
-        }
+    logger.debug(f"Final prompt for Ollama (truncated): {final_prompt[:300]}...")
 
-        logger.info("Sending prompt to Ollama...")
-        try:
-            result = await call_ollama_generate(ollama_payload)
-            answer = result.get("response", "").strip()
-            logger.info("Received answer from Ollama.")
-            return {"final_output": answer}
-        except Exception as e:
-            logger.error(f"Ollama call failed: {e}")
-            raise HTTPException(status_code=500, detail=f"Ollama error: {e}")
+    ollama_payload = {
+        "model": MODEL_NAME,
+        "prompt": final_prompt,
+        "stream": False
+    }
+
+    try:
+        logger.info("Sending prompt to Ollama for generation...")
+        result = await call_ollama_generate(ollama_payload)
+        answer = result.get("response", "").strip()
+        if not answer:
+            logger.warning("Ollama returned an empty response.")
+            raise ValueError("Empty response from Ollama.")
+        logger.info("Successfully received answer from Ollama.")
+        return {"final_output": answer}
+    except Exception as e:
+        logger.error(f"Ollama call failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Ollama error: {e}")
 
 @app.get("/health")
 def health():

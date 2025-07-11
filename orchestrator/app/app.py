@@ -3,8 +3,15 @@ import json
 import time
 import uuid
 import subprocess
+import logging
 from flask import Flask, request, render_template, redirect, session, jsonify, send_from_directory
 import httpx
+
+# ----------------------------------------------------------------------------
+# LOGGING
+# ----------------------------------------------------------------------------
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # ----------------------------------------------------------------------------
 # CONFIGURATION
@@ -28,19 +35,21 @@ TIMEOUT = httpx.Timeout(connect=30.0, read=300.0, write=300.0, pool=60.0)
 def is_engineer1_task(subtask):
     fmt = subtask.get("expected_format", "").lower()
     prompt_text = subtask.get("manager2_prompt", "").lower()
-    if "command" in fmt or "plain text" in fmt:
-        return True
-    if "provide commands" in prompt_text or "command outputs" in prompt_text:
-        return True
-    return False
+    return (
+        "command" in fmt or "plain text" in fmt
+        or "provide commands" in prompt_text
+        or "command outputs" in prompt_text
+    )
 
 def emulate_engineer1_output(subtask):
+    title = subtask.get('subtask', 'Unknown Task')
+    logger.info(f"Emulating Engineer1 output for subtask: {title}")
     return {
         "final_output": f"""[EMULATED ENGINEER1 OUTPUT]
 
 This is simulated command output for subtask:
 
-{subtask.get('subtask', 'Unknown Task')}
+{title}
 
 Example results:
 
@@ -92,7 +101,8 @@ def generate():
 
     try:
         with httpx.Client(timeout=TIMEOUT) as client:
-            # Step 1: Call Manager1
+            # Step 1: Call Manager1 for task decomposition
+            logger.info("Calling Manager1 for task decomposition.")
             manager1_payload = {"user_request": prompt}
             res1 = client.post(f"{MANAGER1_URL}/process", json=manager1_payload)
             res1.raise_for_status()
@@ -107,10 +117,13 @@ def generate():
             if not subtasks:
                 raise ValueError("Manager1 did not return any subtasks.")
 
-            # Step 2: For each subtask → emulate Engineer1 or call Manager2
+            # Step 2: Process subtasks (Engineer1 emulation + Manager2)
             assembled_sections = []
             prior_context = ""
             for idx, subtask in enumerate(subtasks, start=1):
+                subtask_title = subtask.get("subtask", f"Subtask {idx}")
+                logger.info(f"Processing subtask {idx}: {subtask_title}")
+
                 if is_engineer1_task(subtask):
                     # Emulate Engineer1
                     engineer1_result = emulate_engineer1_output(subtask)
@@ -120,12 +133,14 @@ def generate():
                     })
                     prior_context += f"\n\nENGINEER1 OUTPUT:\n{engineer1_result['final_output']}"
                     assembled_sections.append(engineer1_result["final_output"])
+
                 else:
-                    # Manager2 uses prior_context
+                    # Call Manager2 with prior_context
                     manager2_payload = {
                         "subtask": subtask,
                         "prior_context": prior_context
                     }
+                    logger.info(f"Calling Manager2 for subtask {idx}")
                     res2 = client.post(f"{MANAGER2_URL}/process", json=manager2_payload)
                     res2.raise_for_status()
                     manager2_result = res2.json()
@@ -143,14 +158,18 @@ def generate():
             assembled_doc = "\n\n".join(assembled_sections)
             with open(adoc_path, "w") as f:
                 f.write(assembled_doc)
+            logger.info(f"AsciiDoctor source written to {adoc_path}")
 
             # Step 4: Convert to PDF
+            logger.info(f"Converting {adoc_file} to PDF using {ASCIIDOCTOR_CMD}")
             result = subprocess.run(
                 [ASCIIDOCTOR_CMD, adoc_path, "-o", pdf_path],
                 capture_output=True
             )
             if result.returncode != 0:
+                logger.error(result.stderr.decode())
                 raise RuntimeError(f"asciidoctor-pdf error: {result.stderr.decode()}")
+            logger.info(f"PDF generated at {pdf_path}")
 
             # Step 5: Save result in history
             duration = round(time.time() - start_time, 2)
@@ -165,7 +184,7 @@ def generate():
             session["history"] = history
 
     except Exception as e:
-        # Handle failure in one place
+        logger.error(f"Error during generation: {e}")
         duration = round(time.time() - start_time, 2)
         history = session.get("history", [])
         history.append({
